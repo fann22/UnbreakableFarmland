@@ -6,8 +6,7 @@
     "platform": "${modPlatform}",
     "dependencies": [
         {
-            "name": "iListenAttentively",
-            "version": ">=1.0.0"
+            "name": "iListenAttentively"
         }
     ]
 }

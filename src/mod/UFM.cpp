@@ -8,7 +8,6 @@
 #include "ila/event/minecraft/world/level/block/FarmDecayEvent.h"
 
 #include "ll/api/event/player/PlayerPlaceBlockEvent.h"
-
 #include "mc/network/packet/UpdateBlockPacket.h"
 #include "mc/world/level/block/registry/BlockTypeRegistry.h"
 
@@ -37,24 +36,20 @@ bool UFM::enable() {
         }
     );
 
-    gBlockPlaceListener = bus.emplaceListener<ll::event::PlayerPlaceBlockEvent>(
-        [](ll::event::PlayerPlaceBlockEvent& event) {
-            // Cek apakah block yang di-place adalah glass
-            if (event.block().getTypeName() != "minecraft:glass") return;
+    gBlockPlaceListener = bus.emplaceListener<ll::event::PlayerPlacedBlockEvent>(
+        [](ll::event::PlayerPlacedBlockEvent& event) {
+            if (event.placedBlock().getTypeName() != "minecraft:glass") return;
 
-            auto& pos    = event.pos();
-            auto& player = event.self();
-
-            auto& dirtBlock     = BlockTypeRegistry::lookupByName("minecraft:dirt", true);
-            auto  dirtRuntimeId = dirtBlock.getRuntimeId();
+            auto& registry = BlockTypeRegistry::get();
+            auto& dirtBlock = registry.getDefaultBlockState("minecraft:dirt");
 
             UpdateBlockPacket pkt;
-            pkt.mPos            = pos;
-            pkt.mLayer          = UpdateBlockPacket::BlockLayer::Standard;
-            pkt.mBlockRuntimeId = dirtRuntimeId;
-            pkt.mFlags          = BlockUpdateFlag::Network;
+            pkt.mPayload.mPos         = event.pos();
+            pkt.mPayload.mLayer       = 0; // 0 = Standard layer
+            pkt.mPayload.mRuntimeId   = dirtBlock.getRuntimeId();
+            pkt.mPayload.mUpdateFlags = 0;
 
-            player.sendNetworkPacket(pkt);
+            event.self().sendNetworkPacket(pkt);
         }
     );
 
@@ -78,4 +73,4 @@ bool UFM::disable() {
     return true;
 }
 
-} // namespace unbreakable_farmland
+} // namespace unbreakable_farmland;
