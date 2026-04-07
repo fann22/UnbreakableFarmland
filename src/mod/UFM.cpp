@@ -50,7 +50,7 @@ bool UFM::enable() {
             pkt.mPos         = event.pos();
             pkt.mLayer       = 0;
             pkt.mUpdateFlags = 1;
-            pkt.mRuntimeId   = dirtBlock.getRuntimeId();
+            pkt.mRuntimeId   = dirtBlock.mNetworkId;
 
             event.self().sendNetworkPacket(pkt);
         }
