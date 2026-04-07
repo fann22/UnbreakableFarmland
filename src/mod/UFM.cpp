@@ -26,12 +26,12 @@ bool UFM::enable() {
     auto& bus    = ll::event::EventBus::getInstance();
 
     gFarmDecayListener = bus.emplaceListener<ila::mc::FarmDecayBeforeEvent>(
-        [&logger](ila::mc::FarmDecayBeforeEvent& event) {
+        [](ila::mc::FarmDecayBeforeEvent& event) {
             event.cancel();
         }
     );
 
-    logger.info("UnbreakableFarmland active.");
+    getSelf().getLogger().info("UnbreakableFarmland active.");
     return true;
 }
 
