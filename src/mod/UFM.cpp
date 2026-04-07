@@ -40,15 +40,17 @@ bool UFM::enable() {
         [](ll::event::PlayerPlacedBlockEvent& event) {
             if (event.placedBlock().getTypeName() != "minecraft:glass") return;
 
-            auto& registry = BlockTypeRegistry::get();
-            auto& dirtBlock = registry.getDefaultBlockState("minecraft:dirt");
+            auto* dirtBlock = BlockTypeRegistry::lookupByName("minecraft:dirt", true);
+            if (!dirtBlock) return;
 
             UpdateBlockPacket pkt;
-            pkt.mPayload.mPos         = event.pos();
-            pkt.mPayload.mLayer       = 0; // 0 = Standard layer
-            pkt.mPayload.mRuntimeId   = dirtBlock.getRuntimeId();
-            pkt.mPayload.mUpdateFlags = 0;
 
+            auto& payload = static_cast<ll::PayloadPacket<UpdateBlockPacketPayload>&>(pkt).mPayload;
+            payload.mPos         = event.pos();
+            payload.mLayer       = 0; // Standard layer
+            payload.mUpdateFlags = 1; // Network update
+            payload.mRuntimeId   = dirtBlock->getDefaultState().getRuntimeId();
+    
             event.self().sendNetworkPacket(pkt);
         }
     );
