@@ -26,6 +26,7 @@
 #include "mc/world/attribute/BaseAttributeMap.h"
 
 #include "mc/world/level/Level.h"
+#include "mc/world/level/storage/LevelData.h"
 
 #include "mc/world/scores/DisplayObjective.h"
 #include "mc/world/scores/Objective.h"
@@ -78,10 +79,31 @@ LL_TYPE_INSTANCE_HOOK(
     auto& bdse        = BDSE::getInstance();
     bdse.getSelf().getLogger().info("{}: {}", author, message);
 
-    std::string const& newMessage = "§c" + author + "§w: " + message;
+    std::string const& newMessage = "§c" + author + "§f: " + message;
 
     origin("", newMessage, filteredMessage);
 }
+
+LL__TYPE_INSTANCE_HOOK(
+    AchievementsWillBeDisabledHook,
+    ll::memory::HookPriority::Normal,
+    LevelData,
+    &LevelData::achievementsWillBeDisabledOnLoad,
+    bool
+) {
+    return false; // fuck you.
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    DisableAchievementsHook,
+    ll::memory::HookPriority::Normal,
+    LevelData,
+    &LevelData::disableAchievements,
+    void
+) {
+    // 🦗...
+}
+
 
 BDSE& BDSE::getInstance() {
     static BDSE instance;
@@ -117,6 +139,8 @@ bool BDSE::enable() {
     mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
     mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Ascending);
 
+    AchievementsWillBeDisabledHook::hook();
+    DisableAchievementsHook::hook();
     DisplayChatMessageHook::hook();
     PlayerAddLevelHook::hook();
 
@@ -168,6 +192,7 @@ bool BDSE::enable() {
                 if (*id == ScoreboardId::INVALID()) {
                     id = &mScoreboard->createScoreboardId(event.self());
                 }
+                ScoreboardOperationResult result;
                 mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, 0, PlayerScoreSetFunction::Set);
             }
         )
@@ -204,6 +229,8 @@ bool BDSE::enable() {
 }
 
 bool BDSE::disable() {
+    AchievementsWillBeDisabledHook::unhook();
+    DisableAchievementsHook::unhook();
     DisplayChatMessageHook::unhook();
     PlayerAddLevelHook::unhook();
 
