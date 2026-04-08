@@ -33,8 +33,8 @@
 #include "mc/world/scores/ScoreboardId.h"
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
-#include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
-#include "mc/deps/shared_types/legacy/LevelSoundEvent.h"
+// #include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
+// #include "mc/deps/shared_types/legacy/LevelSoundEvent.h"
 
 namespace bds_essentials {
 
@@ -129,7 +129,7 @@ bool BDSE::enable() {
             }
         )
     );
-
+/*
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerAttackEvent>(
@@ -141,7 +141,7 @@ bool BDSE::enable() {
             }
         )
     );
-
+*/
     /*
     gBlockPlaceListener = bus.emplaceListener<ll::event::PlayerPlacedBlockEvent>(
         [this](ll::event::PlayerPlacedBlockEvent& event) {
