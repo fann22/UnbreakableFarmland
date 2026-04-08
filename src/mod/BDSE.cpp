@@ -12,6 +12,8 @@
 #include "ll/api/event/player/PlayerAttackEvent.h"
 #include "ll/api/event/player/PlayerDisconnectEvent.h"
 #include "ll/api/event/player/PlayerJoinEvent.h"
+#include "ll/api/event/player/PlayerDieEvent.h"
+
 #include "ll/api/service/Bedrock.h"
 
 #include "ila/event/minecraft/world/actor/MobHealthChangeEvent.h"
@@ -63,6 +65,24 @@ LL_TYPE_INSTANCE_HOOK(
     origin(lvl);
 }
 
+LL_TYPE_INSTANCE_HOOK(
+    DisplayChatMessageHook,
+    ll::memory::HookPriority::Normal,
+    Player,
+    &Player::$displayChatMessage,
+    void,
+    ::std::string const& author,
+    ::std::string const& message,
+    ::std::optional<::std::string> const filteredMessage
+) {
+    auto& bdse        = BDSE::getInstance();
+    bdse.getSelf().getLogger().info("{}: {}", author, message);
+
+    std::string const& newMessage = "§c" + author + "§w: " + message;
+
+    origin("", newMessage, filteredMessage);
+}
+
 BDSE& BDSE::getInstance() {
     static BDSE instance;
     return instance;
@@ -97,6 +117,7 @@ bool BDSE::enable() {
     mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
     mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Ascending);
 
+    DisplayChatMessageHook::hook();
     PlayerAddLevelHook::hook();
 
     auto& bus = ll::event::EventBus::getInstance();
@@ -141,6 +162,19 @@ bool BDSE::enable() {
 
     gListeners.insert(
         gListeners.begin(),
+        bus.emplaceListener<ll::event::PlayerDieEvent>(
+            [this](ll::event::PlayerDieEvent& event) {
+                ScoreboardId const* id = &mScoreboard->getScoreboardId(event.self());
+                if (*id == ScoreboardId::INVALID()) {
+                    id = &mScoreboard->createScoreboardId(event.self());
+                }
+                mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, 0, PlayerScoreSetFunction::Set);
+            }
+        )
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
         bus.emplaceListener<ila::mc::MobHealthChangeAfterEvent>(
             [this](ila::mc::MobHealthChangeAfterEvent& event) {
                 if (!event.self().isPlayer() || event.newValue() > float(event.self().getMaxHealth())) return;
@@ -170,6 +204,7 @@ bool BDSE::enable() {
 }
 
 bool BDSE::disable() {
+    DisplayChatMessageHook::unhook();
     PlayerAddLevelHook::unhook();
 
     auto& bus = ll::event::EventBus::getInstance();
