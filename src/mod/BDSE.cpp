@@ -1,4 +1,4 @@
-#include "mod/UFM.h"
+#include "mod/BDSE.h"
 
 #include "gsl/pointers"
 #include "ll/api/event/EventBus.h"
@@ -32,22 +32,22 @@
 #include "mc/world/scores/ScoreboardId.h"
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
-namespace unbreakable_farmland {
+namespace bds_essentials {
 
-UFM& UFM::getInstance() {
-    static UFM instance;
+BDSE& BDSE::getInstance() {
+    static BDSE instance;
     return instance;
 }
 
 static std::vector<ll::event::ListenerPtr> gListeners;
 
-bool UFM::load() {
+bool BDSE::load() {
     // getSelf().getLogger().debug("Loading...");
     // Code for loading the mod goes here.
     return true;
 }
 
-bool UFM::enable() {
+bool BDSE::enable() {
     Level*      level      = ll::service::getLevel();
     Scoreboard& scoreboard = level->getScoreboard();
 
@@ -97,7 +97,7 @@ bool UFM::enable() {
                     id = &scoreboard.createScoreboardId(player);
                 }
                 ScoreboardOperationResult result;
-                scoreboard.modifyPlayerScore(result, *id, *HealthObjective, player.getHealth(), PlayerScoreSetFunction::Set);
+                scoreboard.modifyPlayerScore(result, *id, *HealthObjective, 0, PlayerScoreSetFunction::Set);
                 scoreboard.modifyPlayerScore(result, *id, *XPObjective, int(lvl), PlayerScoreSetFunction::Set);
             }
         )
@@ -118,7 +118,7 @@ bool UFM::enable() {
         bus.emplaceListener<ila::mc::MobHealthChangeAfterEvent>(
             [&scoreboard, &HealthObjective](ila::mc::MobHealthChangeAfterEvent& event) {
                 if (!event.self().isPlayer() || event.newValue() > float(event.self().getMaxHealth())) return;
-                UFM::getInstance().getSelf().getLogger().info("{} -> {}", event.oldValue(), event.newValue());
+                BDSE::getInstance().getSelf().getLogger().info("{} -> {}", event.oldValue(), event.newValue());
                 ScoreboardId const&       id = scoreboard.createScoreboardId(event.self());
                 ScoreboardOperationResult result;
                 scoreboard.modifyPlayerScore(result, id, *HealthObjective, int(event.newValue()), PlayerScoreSetFunction::Set);
@@ -152,7 +152,7 @@ bool UFM::enable() {
     return true;
 }
 
-bool UFM::disable() {
+bool BDSE::disable() {
     auto& bus = ll::event::EventBus::getInstance();
 
     for (auto& listener : gListeners) {
@@ -163,6 +163,6 @@ bool UFM::disable() {
     return true;
 }
 
-} // namespace unbreakable_farmland
+} // namespace bds_essentials
 
-LL_REGISTER_MOD(unbreakable_farmland::UFM, unbreakable_farmland::UFM::getInstance());
+LL_REGISTER_MOD(unbreakable_farmland::BDSE, unbreakable_farmland::BDSE::getInstance());

@@ -2,14 +2,14 @@
 
 #include "ll/api/mod/NativeMod.h"
 
-namespace unbreakable_farmland {
+namespace bds_essentials {
 
-class UFM {
+class BDSE {
 
 public:
-    static UFM& getInstance();
+    static BDSE& getInstance();
 
-    UFM() : mSelf(*ll::mod::NativeMod::current()) {}
+    BDSE() : mSelf(*ll::mod::NativeMod::current()) {}
 
     [[nodiscard]] ll::mod::NativeMod& getSelf() const { return mSelf; }
 
@@ -30,4 +30,4 @@ private:
     ll::mod::NativeMod& mSelf;
 };
 
-} // namespace unbreakable_farmland
+} // namespace bds_essentials
