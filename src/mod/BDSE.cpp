@@ -34,7 +34,7 @@
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
 #include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
-#includ3 "mc/deps/shared_types/legacy/LevelSoundEvent.h"
+#include "mc/deps/shared_types/legacy/LevelSoundEvent.h"
 
 namespace bds_essentials {
 
