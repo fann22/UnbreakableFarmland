@@ -1,15 +1,36 @@
 #include "mod/UFM.h"
 
+#include "gsl/pointers"
 #include "ll/api/event/EventBus.h"
 #include "ll/api/event/ListenerBase.h"
+#include "ll/api/io/LogLevel.h"
 #include "ll/api/io/Logger.h"
 #include "ll/api/mod/RegisterHelper.h"
 
+#include "ll/api/event/player/PlayerDisconnectEvent.h"
+#include "ll/api/event/player/PlayerJoinEvent.h"
+#include "ll/api/service/Bedrock.h"
+
+#include "ila/event/minecraft/world/actor/MobHealthChangeEvent.h"
 #include "ila/event/minecraft/world/level/block/FarmDecayEvent.h"
 
-#include "ll/api/event/player/PlayerPlaceBlockEvent.h"
-#include "mc/network/packet/UpdateBlockPacket.h"
-#include "mc/world/level/block/registry/BlockTypeRegistry.h"
+#include "mc/world/actor/Actor.h"
+#include "mc/world/attribute/Attribute.h"
+#include "mc/world/attribute/AttributeInstance.h"
+#include "mc/world/attribute/AttributeInstanceRef.h"
+#include "mc/world/attribute/BaseAttributeMap.h"
+
+#include "mc/world/level/Level.h"
+
+#include "mc/world/scores/DisplayObjective.h"
+#include "mc/world/scores/Objective.h"
+#include "mc/world/scores/ObjectiveCriteria.h"
+#include "mc/world/scores/ObjectiveRenderType.h"
+#include "mc/world/scores/ObjectiveSortOrder.h"
+#include "mc/world/scores/PlayerScoreSetFunction.h"
+#include "mc/world/scores/Scoreboard.h"
+#include "mc/world/scores/ScoreboardId.h"
+#include "mc/world/scores/ScoreboardOperationResult.h"
 
 namespace unbreakable_farmland {
 
@@ -18,8 +39,7 @@ UFM& UFM::getInstance() {
     return instance;
 }
 
-static ll::event::ListenerPtr gFarmDecayListener;
-static ll::event::ListenerPtr gBlockPlaceListener;
+static std::vector<ll::event::ListenerPtr> gListeners;
 
 bool UFM::load() {
     // getSelf().getLogger().debug("Loading...");
@@ -28,52 +48,121 @@ bool UFM::load() {
 }
 
 bool UFM::enable() {
-    auto& bus    = ll::event::EventBus::getInstance();
+    Level*      level      = ll::service::getLevel();
+    Scoreboard& scoreboard = level->getScoreboard();
 
-    gFarmDecayListener = bus.emplaceListener<ila::mc::FarmDecayBeforeEvent>(
-        [](ila::mc::FarmDecayBeforeEvent& event) {
-            event.cancel();
-        }
+    auto objectives = scoreboard.getObjectives();
+    for (auto* obj : objectives) {
+        scoreboard.removeObjective(const_cast<Objective*>(obj));
+    }
+
+    ObjectiveCriteria* criteria = scoreboard.getCriteria(Scoreboard::DEFAULT_CRITERIA());
+    if (!criteria) {
+        criteria = const_cast<ObjectiveCriteria*>(
+            &scoreboard.createObjectiveCriteria(Scoreboard::DEFAULT_CRITERIA(), false, ::ObjectiveRenderType::Integer)
+        );
+    }
+
+    Objective* HealthObjective = scoreboard.getObjective("PlayerHealth");
+    if (!HealthObjective) {
+        HealthObjective = scoreboard.addObjective("PlayerHealth", "❤", *criteria);
+        scoreboard
+            .setDisplayObjective(Scoreboard::DISPLAY_SLOT_BELOWNAME(), *HealthObjective, ObjectiveSortOrder::Ascending);
+    }
+
+    Objective* XPObjective = scoreboard.getObjective("MostLVL");
+    if (!XPObjective) {
+        XPObjective = scoreboard.addObjective("MostLVL", "•> Most Level <•", *criteria);
+        scoreboard.setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *XPObjective, ObjectiveSortOrder::Ascending);
+    }
+
+    auto& bus = ll::event::EventBus::getInstance();
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ila::mc::FarmDecayBeforeEvent>([](ila::mc::FarmDecayBeforeEvent& event) { event.cancel(); })
     );
 
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ll::event::PlayerJoinEvent>(
+            [&scoreboard, &HealthObjective, &XPObjective](ll::event::PlayerJoinEvent& event) {
+                Player&              player  = event.self();
+                auto&                attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
+                AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
+                float                lvl     = ref.mPtr->mCurrentValue;
+
+                ScoreboardId const* id = &scoreboard.getScoreboardId(player);
+                if (*id == ScoreboardId::INVALID()) {
+                    id = &scoreboard.createScoreboardId(player);
+                }
+                ScoreboardOperationResult result;
+                scoreboard.modifyPlayerScore(result, *id, *HealthObjective, player.getHealth(), PlayerScoreSetFunction::Set);
+                scoreboard.modifyPlayerScore(result, *id, *XPObjective, int(lvl), PlayerScoreSetFunction::Set);
+            }
+        )
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ll::event::PlayerDisconnectEvent>(
+            [&scoreboard](ll::event::PlayerDisconnectEvent& event) {
+                ScoreboardId const& id = scoreboard.createScoreboardId(event.self());
+                scoreboard.resetPlayerScore(id);
+            }
+        )
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ila::mc::MobHealthChangeAfterEvent>(
+            [&scoreboard, &HealthObjective](ila::mc::MobHealthChangeAfterEvent& event) {
+                if (!event.self().isPlayer() || event.newValue() > float(event.self().getMaxHealth())) return;
+                UFM::getInstance().getSelf().getLogger().info("{} -> {}", event.oldValue(), event.newValue());
+                ScoreboardId const&       id = scoreboard.createScoreboardId(event.self());
+                ScoreboardOperationResult result;
+                scoreboard.modifyPlayerScore(result, id, *HealthObjective, int(event.newValue()), PlayerScoreSetFunction::Set);
+            }
+        )
+    );
+
+    /*
     gBlockPlaceListener = bus.emplaceListener<ll::event::PlayerPlacedBlockEvent>(
-        [](ll::event::PlayerPlacedBlockEvent& event) {
+        [this](ll::event::PlayerPlacedBlockEvent& event) {
+            getSelf().getLogger().info("Block placed by player: " + event.placedBlock().getTypeName());
             if (event.placedBlock().getTypeName() != "minecraft:glass") return;
 
-            // Ambil Block dirt via registry
             auto& registry  = BlockTypeRegistry::get();
             auto& dirtBlock = registry.getDefaultBlockState("minecraft:dirt");
 
-            UpdateBlockPacket pkt;
+            getSelf().getLogger().info(dirtBlock.getTypeName());
 
-            // Field payload langsung ada di pkt karena multiple inheritance
+            UpdateBlockPacket pkt;
             pkt.mPos         = event.pos();
             pkt.mLayer       = 0;
             pkt.mUpdateFlags = 1;
-            pkt.mRuntimeId   = dirtBlock.mNetworkId;
+            pkt.mRuntimeId   = dirtBlock.mSerializationIdHashForNetwork;
 
-            event.self().sendNetworkPacket(pkt);
+            auto& player = event.self();
+            player.sendNetworkPacket(pkt);
         }
-    );
+    );*/
 
-    getSelf().getLogger().info("UnbreakableFarmland active.");
+    getSelf().getLogger().info("loaded.");
     return true;
 }
 
 bool UFM::disable() {
     auto& bus = ll::event::EventBus::getInstance();
 
-    if (gFarmDecayListener) {
-        bus.removeListener(gFarmDecayListener);
-        gFarmDecayListener.reset();
-    }
-
-    if (gBlockPlaceListener) {
-        bus.removeListener(gBlockPlaceListener);
-        gBlockPlaceListener.reset();
+    for (auto& listener : gListeners) {
+        bus.removeListener(listener);
+        listener.reset();
     }
 
     return true;
 }
 
-} // namespace unbreakable_farmland;
+} // namespace unbreakable_farmland
+
+LL_REGISTER_MOD(unbreakable_farmland::UFM, unbreakable_farmland::UFM::getInstance());
