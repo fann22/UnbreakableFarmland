@@ -52,33 +52,25 @@ bool BDSE::load() {
 }
 
 bool BDSE::enable() {
-    Level*      level      = ll::service::getLevel();
-    Scoreboard& scoreboard = level->getScoreboard();
+    mScoreboard = &ll::service::getLevel()->getScoreboard();
 
-    auto objectives = scoreboard.getObjectives();
+    auto objectives = mScoreboard->getObjectives();
     for (auto* obj : objectives) {
-        scoreboard.removeObjective(const_cast<Objective*>(obj));
+        mScoreboard->removeObjective(const_cast<Objective*>(obj));
     }
 
-    ObjectiveCriteria* criteria = scoreboard.getCriteria(Scoreboard::DEFAULT_CRITERIA());
+    ObjectiveCriteria* criteria = mScoreboard->getCriteria(Scoreboard::DEFAULT_CRITERIA());
     if (!criteria) {
         criteria = const_cast<ObjectiveCriteria*>(
-            &scoreboard.createObjectiveCriteria(Scoreboard::DEFAULT_CRITERIA(), false, ::ObjectiveRenderType::Integer)
+            &mScoreboard->createObjectiveCriteria(Scoreboard::DEFAULT_CRITERIA(), false, ::ObjectiveRenderType::Integer)
         );
     }
 
-    Objective* HealthObjective = scoreboard.getObjective("PlayerHealth");
-    if (!HealthObjective) {
-        HealthObjective = scoreboard.addObjective("PlayerHealth", "❤", *criteria);
-        scoreboard
-            .setDisplayObjective(Scoreboard::DISPLAY_SLOT_BELOWNAME(), *HealthObjective, ObjectiveSortOrder::Ascending);
-    }
+    mHealthObjective = mScoreboard->addObjective("PlayerHealth", "❤", *criteria);
+    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_BELOWNAME(), *mHealthObjective, ObjectiveSortOrder::Ascending);
 
-    Objective* XPObjective = scoreboard.getObjective("MostLVL");
-    if (!XPObjective) {
-        XPObjective = scoreboard.addObjective("MostLVL", "•> Most Level <•", *criteria);
-        scoreboard.setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *XPObjective, ObjectiveSortOrder::Ascending);
-    }
+    mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
+    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Ascending);
 
     auto& bus = ll::event::EventBus::getInstance();
 
@@ -90,19 +82,19 @@ bool BDSE::enable() {
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerJoinEvent>(
-            [&scoreboard, &HealthObjective, &XPObjective](ll::event::PlayerJoinEvent& event) {
+            [this](ll::event::PlayerJoinEvent& event) {
                 Player&              player  = event.self();
                 auto&                attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
                 AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
                 float                lvl     = ref.mPtr->mCurrentValue;
 
-                ScoreboardId const* id = &scoreboard.getScoreboardId(player);
+                ScoreboardId const* id = &mScoreboard->getScoreboardId(player);
                 if (*id == ScoreboardId::INVALID()) {
-                    id = &scoreboard.createScoreboardId(player);
+                    id = &mScoreboard->createScoreboardId(player);
                 }
                 ScoreboardOperationResult result;
-                scoreboard.modifyPlayerScore(result, *id, *HealthObjective, 0, PlayerScoreSetFunction::Set);
-                scoreboard.modifyPlayerScore(result, *id, *XPObjective, int(lvl), PlayerScoreSetFunction::Set);
+                mScoreboard->modifyPlayerScore(result, *id, *mHealthObjective, player.getHealth(), PlayerScoreSetFunction::Set);
+                mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, int(lvl), PlayerScoreSetFunction::Set);
             }
         )
     );
@@ -110,9 +102,12 @@ bool BDSE::enable() {
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerDisconnectEvent>(
-            [&scoreboard](ll::event::PlayerDisconnectEvent& event) {
-                ScoreboardId const& id = scoreboard.createScoreboardId(event.self());
-                scoreboard.resetPlayerScore(id);
+            [this](ll::event::PlayerDisconnectEvent& event) {
+                ScoreboardId const* id = &mScoreboard->getScoreboardId(event.self());
+                if (*id == ScoreboardId::INVALID()) {
+                    id = &mScoreboard->createScoreboardId(event.self());
+                }
+                mScoreboard->resetPlayerScore(*id);
             }
         )
     );
@@ -120,12 +115,12 @@ bool BDSE::enable() {
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ila::mc::MobHealthChangeAfterEvent>(
-            [&scoreboard, &HealthObjective](ila::mc::MobHealthChangeAfterEvent& event) {
+            [this](ila::mc::MobHealthChangeAfterEvent& event) {
                 if (!event.self().isPlayer() || event.newValue() > float(event.self().getMaxHealth())) return;
                 BDSE::getInstance().getSelf().getLogger().info("{} -> {}", event.oldValue(), event.newValue());
-                ScoreboardId const&       id = scoreboard.createScoreboardId(event.self());
+                ScoreboardId const&       id = mScoreboard->createScoreboardId(event.self());
                 ScoreboardOperationResult result;
-                scoreboard.modifyPlayerScore(result, id, *HealthObjective, int(event.newValue()), PlayerScoreSetFunction::Set);
+                mScoreboard->modifyPlayerScore(result, id, *mHealthObjective, int(event.newValue()), PlayerScoreSetFunction::Set);
             }
         )
     );
@@ -142,27 +137,6 @@ bool BDSE::enable() {
         )
     );
 */
-    /*
-    gBlockPlaceListener = bus.emplaceListener<ll::event::PlayerPlacedBlockEvent>(
-        [this](ll::event::PlayerPlacedBlockEvent& event) {
-            getSelf().getLogger().info("Block placed by player: " + event.placedBlock().getTypeName());
-            if (event.placedBlock().getTypeName() != "minecraft:glass") return;
-
-            auto& registry  = BlockTypeRegistry::get();
-            auto& dirtBlock = registry.getDefaultBlockState("minecraft:dirt");
-
-            getSelf().getLogger().info(dirtBlock.getTypeName());
-
-            UpdateBlockPacket pkt;
-            pkt.mPos         = event.pos();
-            pkt.mLayer       = 0;
-            pkt.mUpdateFlags = 1;
-            pkt.mRuntimeId   = dirtBlock.mSerializationIdHashForNetwork;
-
-            auto& player = event.self();
-            player.sendNetworkPacket(pkt);
-        }
-    );*/
 
     getSelf().getLogger().info("loaded.");
     return true;
@@ -175,6 +149,12 @@ bool BDSE::disable() {
         bus.removeListener(listener);
         listener.reset();
     }
+
+    gListeners.clear();
+
+    mScoreboard      = nullptr;
+    mHealthObjective = nullptr;
+    mXPObjective     = nullptr;
 
     return true;
 }

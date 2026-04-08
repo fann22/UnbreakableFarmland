@@ -2,6 +2,9 @@
 
 #include "ll/api/mod/NativeMod.h"
 
+#include "mc/world/scores/Objective.h"
+#include "mc/world/scores/Scoreboard.h"
+
 namespace bds_essentials {
 
 class BDSE {
@@ -26,8 +29,13 @@ public:
     // /// @return True if the mod is unloaded successfully.
     // bool unload();
 
+
 private:
     ll::mod::NativeMod& mSelf;
+
+    Scoreboard* mScoreboard      = nullptr;
+    Objective*  mHealthObjective = nullptr;
+    Objective*  mXPObjective     = nullptr;
 };
 
 } // namespace bds_essentials
