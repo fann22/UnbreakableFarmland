@@ -60,15 +60,20 @@ LL_TYPE_INSTANCE_HOOK(
     
     BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*this->getAttributes());
     AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
-    int                  fixLvl  = lvl;
-    if (fixLvl < 0) fixLvl = 0; // Might be negative, we don't want that.
-    int                  newLvl  = int(ref.mPtr->mCurrentValue) + fixLvl;
+    int                  fixLvl  = std::max(0, int(ref.mPtr->mCurrentValue) + lvl);
+    // using std::max() cuz the value might be negative, we definitely don't want that to happend.
 
     if (scoreboard && xpObjective) {
-        ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this = Player
+        ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this == Player
         if (id != ScoreboardId::INVALID()) {
             ScoreboardOperationResult result;
-            scoreboard->modifyPlayerScore(result, id, *xpObjective, newLvl, PlayerScoreSetFunction::Add);
+            scoreboard->modifyPlayerScore(
+                result,
+                id,
+                *xpObjective,
+                fixLvl,
+                PlayerScoreSetFunction::Set
+            );
         }
     }
 
@@ -158,13 +163,13 @@ bool BDSE::enable() {
             Player&              player  = event.self();
             BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
             AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
-            float                lvl     = ref.mPtr->mCurrentValue;
+            int                  lvl     = static_cast<int>(ref.mPtr->mCurrentValue);
 
             ScoreboardId const* id = getOrCreateScoreboardId(player);
 
             ScoreboardOperationResult result;
             mScoreboard->modifyPlayerScore(result, *id, *mHealthObjective, player.getHealth(), PlayerScoreSetFunction::Set);
-            mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, int(lvl), PlayerScoreSetFunction::Set);
+            mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, lvl, PlayerScoreSetFunction::Set);
         })
     );
 
@@ -206,7 +211,7 @@ bool BDSE::enable() {
                 result,
                 *id,
                 *mHealthObjective,
-                int((std::round(event.newValue() * 2) / 2) * 2), 
+                static_cast<int>(std::round(event.newValue() * 2.0f) / 2), 
                 PlayerScoreSetFunction::Set
             );
         })
