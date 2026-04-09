@@ -9,19 +9,22 @@
 
 #include "ll/api/memory/Hook.h"
 
-// #include "ll/api/event/player/PlayerAttackEvent.h"
+#include "ll/api/event/entity/ActorHurtEvent.h"
+
 #include "ll/api/event/player/PlayerChatEvent.h"
 #include "ll/api/event/player/PlayerDieEvent.h"
 #include "ll/api/event/player/PlayerDisconnectEvent.h"
 #include "ll/api/event/player/PlayerJoinEvent.h"
 
+#include "ll/api/thread/ThreadPoolExecutor.h"
+
 #include "ll/api/service/Bedrock.h"
 
+#include "ila/event/minecraft/server/ServerPongEvent.h"
 #include "ila/event/minecraft/world/actor/MobHealthChangeEvent.h"
 #include "ila/event/minecraft/world/level/block/FarmDecayEvent.h"
 
-// #include "mc/deps/shared_types/legacy/LevelSoundEvent.h"
-// #include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
+#include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
 
 #include "mc/world/actor/Actor.h"
 #include "mc/world/actor/player/PlayerListEntry.h"
@@ -44,6 +47,9 @@
 #include "mc/world/scores/ScoreboardId.h"
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
+#include "mc/network/packet/PlaySoundPacket.h"
+#include "mc/network/packet/PlaySoundPacketPayload.h"
+
 namespace bds_essentials {
 
 LL_TYPE_INSTANCE_HOOK(
@@ -60,15 +66,20 @@ LL_TYPE_INSTANCE_HOOK(
     
     BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*this->getAttributes());
     AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
-    int                  fixLvl  = lvl;
-    if (fixLvl < 0) fixLvl = 0; // Might be negative, we don't want that.
-    int                  newLvl  = int(ref.mPtr->mCurrentValue) + fixLvl;
+    int                  fixLvl  = std::max(0, int(ref.mPtr->mCurrentValue) + lvl);
+    // using std::max() cuz the value might be negative, we definitely don't want that to happend.
 
     if (scoreboard && xpObjective) {
-        ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this = Player
+        ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this == Player
         if (id != ScoreboardId::INVALID()) {
             ScoreboardOperationResult result;
-            scoreboard->modifyPlayerScore(result, id, *xpObjective, newLvl, PlayerScoreSetFunction::Add);
+            scoreboard->modifyPlayerScore(
+                result,
+                id,
+                *xpObjective,
+                fixLvl,
+                PlayerScoreSetFunction::Set
+            );
         }
     }
 
@@ -112,6 +123,14 @@ BDSE& BDSE::getInstance() {
 }
 
 static std::vector<ll::event::ListenerPtr> gListeners;
+static std::vector<std::string> gMotdMessages = {
+    "•> Anomaly Survival! <•",
+    "•> DEAD = GAY <•",
+    "•> Vanilla Survival! <•",
+    "•> 104.248.154.230:19134 <•"
+};
+static std::atomic<int>  gMotdIndex = 0;
+static std::atomic<bool> gRunning   = false;
 
 bool BDSE::load() {
     // getSelf().getLogger().debug("Loading...");
@@ -120,6 +139,14 @@ bool BDSE::load() {
 }
 
 bool BDSE::enable() {
+    gRunning = true;
+    ll::thread::ThreadPoolExecutor::getDefault().execute([]() {
+        while (gRunning) {
+            gMotdIndex = (gMotdIndex + 1) % gMotdMessages.size();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+        }
+    });
+
     ll::service::getLevel()->getLevelData().mAchievementsDisabled = false;
     mScoreboard = &ll::service::getLevel()->getScoreboard();
 
@@ -154,17 +181,26 @@ bool BDSE::enable() {
 
     gListeners.insert(
         gListeners.begin(),
+        bus.emplaceListener<ila::mc::ServerPongBeforeEvent>(
+            [](ila::mc::ServerPongBeforeEvent& event) {
+                event.motd() = gMotdMessages[gMotdIndex];
+            }
+        )
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerJoinEvent>([this](ll::event::PlayerJoinEvent& event) {
             Player&              player  = event.self();
             BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
             AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
-            float                lvl     = ref.mPtr->mCurrentValue;
+            int                  lvl     = static_cast<int>(ref.mPtr->mCurrentValue);
 
             ScoreboardId const* id = getOrCreateScoreboardId(player);
 
             ScoreboardOperationResult result;
             mScoreboard->modifyPlayerScore(result, *id, *mHealthObjective, player.getHealth(), PlayerScoreSetFunction::Set);
-            mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, int(lvl), PlayerScoreSetFunction::Set);
+            mScoreboard->modifyPlayerScore(result, *id, *mXPObjective, lvl, PlayerScoreSetFunction::Set);
         })
     );
 
@@ -206,22 +242,30 @@ bool BDSE::enable() {
                 result,
                 *id,
                 *mHealthObjective,
-                int((std::round(event.newValue() * 2) / 2) * 2), 
+                static_cast<int>(std::round(event.newValue() * 2.0f) / 2), 
                 PlayerScoreSetFunction::Set
             );
         })
     );
 
-    /*gListeners.insert(
+    gListeners.insert(
         gListeners.begin(),
-        bus.emplaceListener<ll::event::PlayerAttackEvent>([](ll::event::PlayerAttackEvent& event) {
-            BDSE::getInstance().getSelf().getLogger().info("Damage source: {}", event.cause());
-            if (event.cause() == SharedTypes::Legacy::ActorDamageCause::Projectile) {
-                Actor& player = event.self();
-                player.playSynchronizedSound(SharedTypes::Legacy::LevelSoundEvent::LevelUp, player.getPosition(), 0, true);
+        bus.emplaceListener<ll::event::ActorHurtEvent>([](ll::event::ActorHurtEvent& event) {
+            // BDSE::getInstance().getSelf().getLogger().info("Damage source: {}", event.source().mCause);
+            if (event.source().mCause == SharedTypes::Legacy::ActorDamageCause::Projectile) {
+                Player* player = ll::service::getLevel()->getPlayer(event.source().getEntityUniqueID());
+                if (!player) return;
+
+                PlaySoundPacket packet(PlaySoundPacketPayload(
+                    "random.orb",
+                    player->getPosition(),
+                    0.8f, // volume
+                    1.2f  // pitch
+                ));
+                player->sendNetworkPacket(packet);
             }
         })
-    );*/
+    );
 
     gListeners.insert(
         gListeners.begin(),
@@ -243,6 +287,8 @@ bool BDSE::enable() {
 }
 
 bool BDSE::disable() {
+    gRunning = false;
+
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();
