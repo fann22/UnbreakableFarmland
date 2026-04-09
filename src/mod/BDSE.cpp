@@ -1,5 +1,6 @@
 #include "mod/BDSE.h"
 
+#include "freeCamera/FreeCamera.h"
 #include "gsl/pointers"
 #include "ll/api/event/EventBus.h"
 #include "ll/api/event/ListenerBase.h"
@@ -9,9 +10,11 @@
 
 #include "ll/api/memory/Hook.h"
 
+#include "ll/api/command/CommandHandle.h"
+#include "ll/api/command/CommandRegistrar.h"
+
 #include "ll/api/event/entity/ActorHurtEvent.h"
 
-#include "ll/api/event/player/PlayerChatEvent.h"
 #include "ll/api/event/player/PlayerDieEvent.h"
 #include "ll/api/event/player/PlayerDisconnectEvent.h"
 #include "ll/api/event/player/PlayerJoinEvent.h"
@@ -21,18 +24,26 @@
 #include "ll/api/service/Bedrock.h"
 
 #include "ila/event/minecraft/server/ServerPongEvent.h"
+#include "ila/event/minecraft/server/SendPacketEvent.h"
+
 #include "ila/event/minecraft/world/actor/MobHealthChangeEvent.h"
 #include "ila/event/minecraft/world/level/block/FarmDecayEvent.h"
 
 #include "mc/deps/shared_types/legacy/actor/ActorDamageCause.h"
 
+#include "mc/server/ServerInstance.h"
+#include "mc/server/commands/CommandOutput.h"
+
 #include "mc/world/actor/Actor.h"
+#include "mc/world/actor/player/Player.h"
 #include "mc/world/actor/player/PlayerListEntry.h"
 #include "mc/world/attribute/Attribute.h"
 #include "mc/world/attribute/AttributeInstance.h"
 #include "mc/world/attribute/AttributeInstanceRef.h"
 #include "mc/world/attribute/BaseAttributeMap.h"
 
+#include "mc/world/item/Item.h"
+#include "mc/world/item/registry/ItemRegistryRef.h"
 #include "mc/world/level/ILevel.h"
 #include "mc/world/level/Level.h"
 #include "mc/world/level/storage/LevelData.h"
@@ -47,6 +58,8 @@
 #include "mc/world/scores/ScoreboardId.h"
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
+#include "mc/network/packet/ActorEventPacket.h"
+#include "mc/network/packet/TextPacket.h"
 #include "mc/network/packet/PlaySoundPacket.h"
 #include "mc/network/packet/PlaySoundPacketPayload.h"
 
@@ -124,10 +137,10 @@ BDSE& BDSE::getInstance() {
 
 static std::vector<ll::event::ListenerPtr> gListeners;
 static std::vector<std::string> gMotdMessages = {
-    "•> Anomaly Survival! <•",
-    "•> DEAD = GAY <•",
-    "•> Vanilla Survival! <•",
-    "•> 104.248.154.230:19134 <•"
+    "•> 𝗔𝗻𝗼𝗺𝗮𝗹𝘆 𝗦𝘂𝗿𝘃𝗶𝘃𝗮𝗹! <•",
+    "•> 𝗗𝗘𝗔𝗗 = 𝗚𝗔𝗬 <•",
+    "•> 𝗩𝗮𝗻𝗶𝗹𝗹𝗮 𝗦𝗲𝗿𝘃𝗲𝗿 <•",
+    "•> 𝟭𝟬𝟰.𝟮𝟰𝟴.𝟭𝟱𝟰.𝟮𝟯𝟬 <•"
 };
 static std::atomic<int>  gMotdIndex = 0;
 static std::atomic<bool> gRunning   = false;
@@ -146,6 +159,32 @@ bool BDSE::enable() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         }
     });
+
+    freeCamera::FreeCameraManager::freecameraHook(true);
+    auto& cmd = ll::command::CommandRegistrar::getInstance(false).getOrCreateCommand("freecamera", "Toggle freecam");
+    ll::service::getCommandRegistry()->registerAlias("freecamera", "fc");
+    cmd.overload().execute([&](CommandOrigin const& origin, CommandOutput& output) {
+            auto entity = origin.getEntity();
+            if (entity == nullptr || !entity->isType(ActorType::Player)) {
+                output.error("Only players can run this command.");
+                return;
+            }
+            auto* player = ll::service::getLevel()->getPlayer(entity->getOrCreateUniqueID());
+            if (!player) {
+                output.error("Didn't found the target player.");
+                return;
+            }
+            auto guid = player->getNetworkIdentifier().mGuid.g;
+            if (!freeCamera::FreeCameraManager::getInstance().FreeCamList.count(guid)) {
+                freeCamera::FreeCameraManager::EnableFreeCamera(player);
+                output.success("FreeCamera enabled.");
+            } else {
+                freeCamera::FreeCameraManager::DisableFreeCamera(player);
+                output.success("FreeCamera disabled.");
+            }
+            return;
+        }
+    );
 
     ll::service::getLevel()->getLevelData().mAchievementsDisabled = false;
     mScoreboard = &ll::service::getLevel()->getScoreboard();
@@ -184,6 +223,32 @@ bool BDSE::enable() {
         bus.emplaceListener<ila::mc::ServerPongBeforeEvent>(
             [](ila::mc::ServerPongBeforeEvent& event) {
                 event.motd() = gMotdMessages[gMotdIndex];
+            }
+        )
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ila::mc::SendPacketBeforeEvent<TextPacket>>(
+            [](ila::mc::SendPacketBeforeEvent<TextPacket>& event) {
+                auto& packet = event.packet();
+                auto& body = *reinterpret_cast<std::variant<
+                    TextPacketPayload::MessageOnly,
+                    TextPacketPayload::AuthorAndMessage,
+                    TextPacketPayload::MessageAndParams
+                >*>(&packet.mBody);
+
+                if (auto* msg = std::get_if<TextPacketPayload::AuthorAndMessage>(&body)) {
+                    if (msg->mType == TextPacketType::Chat) {
+                        BDSE::getInstance().getSelf().getLogger().info(
+                            "{}: {}",
+                            msg->mAuthor.get(),
+                            msg->mMessage.get()
+                        );
+                        TextPacket::createRawMessage("§b" + msg->mAuthor.get() + "§f: " + msg->mMessage.get()).sendToClients();
+                        event.cancel();
+                    }
+                }
             }
         )
     );
@@ -266,7 +331,7 @@ bool BDSE::enable() {
             }
         })
     );
-
+/*
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerChatEvent>([](ll::event::PlayerChatEvent& event) {
@@ -281,7 +346,7 @@ bool BDSE::enable() {
             event.cancel();
         })
     );
-
+*/
     getSelf().getLogger().info("loaded.");
     return true;
 }
@@ -289,6 +354,7 @@ bool BDSE::enable() {
 bool BDSE::disable() {
     gRunning = false;
 
+    freeCamera::FreeCameraManager::freecameraHook(false);
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();

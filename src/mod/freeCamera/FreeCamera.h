@@ -4,7 +4,8 @@
 #include "mc/world/actor/player/Player.h"
 
 #include <unordered_set>
-namespace coral_fans::functions {
+
+namespace bds_essentials::freeCamera {
 class FreeCameraManager {
 public:
     std::unordered_set<unsigned long long> FreeCamList;
@@ -16,4 +17,4 @@ public:
     static void EnableFreeCamera(Player* pl);
     static void freecameraHook(bool enable);
 };
-} // namespace coral_fans::functions
+} // namespace bds_essentials::freeCamera

@@ -1,21 +1,27 @@
+// from https://github.com/CoralFans-Dev/CoralFans
 // from https://github.com/GroupMountain/FreeCamera
+
 #include "FreeCamera.h"
 #include "ll/api/memory/Hook.h"
+#include "ll/api/memory/Memory.h"
 #include "ll/api/service/Bedrock.h"
 #include "mc/legacy/ActorUniqueID.h"
+#include "mc/network/NetworkPeer.h"
 #include "mc/network/ServerNetworkHandler.h"
 #include "mc/network/packet/AddPlayerPacket.h"
 #include "mc/network/packet/PlayerSkinPacket.h"
 #include "mc/network/packet/RemoveActorPacket.h"
 #include "mc/network/packet/UpdateAbilitiesPacket.h"
 #include "mc/network/packet/UpdatePlayerGameTypePacket.h"
+#include "mc/platform/UUID.h"
 #include "mc/server/ServerPlayer.h"
 #include "mc/world/actor/Actor.h "
+#include "mc/world/actor/player/SerializedSkinRef.h"
 #include "mc/world/level/Level.h"
 #include "mc/world/level/Tick.h"
 
 
-namespace coral_fans::functions {
+namespace bds_essentials::freeCamera {
 
 void EnableFreeCameraPacket(Player* pl) {
     auto pkt            = UpdatePlayerGameTypePacket();
@@ -34,14 +40,42 @@ void SendFakePlayerPacket(Player* pl) {
     pkt1.mUuid            = randomUuid;
     pl->sendNetworkPacket(pkt1);
     // Update Skin
+/*
+    PlayerSkinPacketPayload* payload = reinterpret_cast<PlayerSkinPacketPayload*>(
+        ::operator new(sizeof(PlayerSkinPacketPayload))
+    );
+    new (&payload->mUUID) mce::UUID(randomUuid);
+    new (&payload->mSkin) SerializedSkinRef(*pl->mSkin);
+    new (&payload->mLocalizedNewSkinName) std::string("");
+    new (&payload->mLocalizedOldSkinName)std::string("");
 
-    auto pkt2                  = PlayerSkinPacket();
-    pkt2.mUUID                 = randomUuid;
-    pkt2.mSkin                 = *pl->mSkin;
-    pkt2.mLocalizedNewSkinName = "";
-    pkt2.mLocalizedOldSkinName = "";
-    pkt2.sendTo(*pl);
+    PlayerSkinPacket* packet = reinterpret_cast<PlayerSkinPacket*>(
+        ::operator new(sizeof(PlayerSkinPacket))
+    );
+    packet->$ctor(std::move(*payload));
+    pl->sendNetworkPacket(*packet);
+    packet->$dtor();
+    ::operator delete(packet);
+    ::operator delete(payload);*/
 
+    // PlayerSkinPacket pkt2      = PlayerSkinPacket();
+    // pkt2.mUUID                 = randomUuid;
+    // pkt2.mSkin                 = *pl->mSkin;
+    // pkt2.mLocalizedNewSkinName = "";
+    // pkt2.mLocalizedOldSkinName = "";
+    // pkt2.sendTo(*pl);
+
+    // alignas(PlayerSkinPacket) std::byte buf[sizeof(PlayerSkinPacket)];
+    // ll::memory::construct<PlayerSkinPacket>(buf, 0);
+    // auto* pkt = reinterpret_cast<PlayerSkinPacket*>(buf);
+    // auto* payload = static_cast<PlayerSkinPacketPayload*>(pkt);
+    // payload->mUUID                 = randomUuid;
+    // payload->mSkin                 = *pl->mSkin;
+    // payload->mLocalizedNewSkinName = "";
+    // payload->mLocalizedOldSkinName = "";
+    
+    // pkt->sendTo(*pl);
+    // pkt->~PlayerSkinPacket();
 
     // gmlib::network::GMBinaryStream bs;
     // bs.writePacketHeader(MinecraftPacketIds::PlayerSkin);
@@ -129,7 +163,9 @@ LL_TYPE_INSTANCE_HOOK(
     NetworkIdentifier const&     id,
     PlayerAuthInputPacket const& pkt
 ) {
-    if (!FreeCameraManager::getInstance().FreeCamList.contains(id.mGuid.g)) {
+    if (FreeCameraManager::getInstance().FreeCamList.contains(id.mGuid.g)) {
+        return;
+    } else {
         origin(id, pkt);
     }
 }
@@ -213,4 +249,4 @@ void FreeCameraManager::freecameraHook(bool enable) {
     }
 };
 
-} // namespace coral_fans::functions
+} // namespace bds_essentials::freeCamera
