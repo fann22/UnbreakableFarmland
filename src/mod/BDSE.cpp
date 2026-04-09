@@ -54,15 +54,19 @@ LL_TYPE_INSTANCE_HOOK(
     void,
     int lvl
 ) {
-    auto& bdse        = BDSE::getInstance();
-    auto* scoreboard  = bdse.getScoreboard();
+    auto& bdse             = BDSE::getInstance();
+    auto* scoreboard = bdse.getScoreboard();
     auto* xpObjective = bdse.getXPObjective();
+    
+    BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*this->getAttributes());
+    AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
+    int                  newLvl  = int(ref.mPtr->mCurrentValue) + lvl;
 
     if (scoreboard && xpObjective) {
         ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this = Player
         if (id != ScoreboardId::INVALID()) {
             ScoreboardOperationResult result;
-            scoreboard->modifyPlayerScore(result, id, *xpObjective, lvl, PlayerScoreSetFunction::Add);
+            scoreboard->modifyPlayerScore(result, id, *xpObjective, newLvl, PlayerScoreSetFunction::Add);
         }
     }
 
@@ -130,10 +134,10 @@ bool BDSE::enable() {
     }
 
     mHealthObjective = mScoreboard->addObjective("PlayerHealth", "❤", *criteria);
-    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_BELOWNAME(), *mHealthObjective, ObjectiveSortOrder::Ascending);
+    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_BELOWNAME(), *mHealthObjective, ObjectiveSortOrder::Descending);
 
     mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
-    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Ascending);
+    mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Descending);
 
     AchievementsWillBeDisabledHook::hook();
     DisableAchievementsHook::hook();
@@ -150,7 +154,7 @@ bool BDSE::enable() {
         gListeners.begin(),
         bus.emplaceListener<ll::event::PlayerJoinEvent>([this](ll::event::PlayerJoinEvent& event) {
             Player&              player  = event.self();
-            auto&                attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
+            BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*player.getAttributes());
             AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
             float                lvl     = ref.mPtr->mCurrentValue;
 
