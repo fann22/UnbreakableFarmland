@@ -54,13 +54,15 @@ LL_TYPE_INSTANCE_HOOK(
     void,
     int lvl
 ) {
-    auto& bdse             = BDSE::getInstance();
-    auto* scoreboard = bdse.getScoreboard();
-    auto* xpObjective = bdse.getXPObjective();
+    BDSE&       bdse        = BDSE::getInstance();
+    Scoreboard* scoreboard  = bdse.getScoreboard();
+    Objective*  xpObjective = bdse.getXPObjective();
     
     BaseAttributeMap&    attrMap = const_cast<BaseAttributeMap&>(*this->getAttributes());
     AttributeInstanceRef ref     = attrMap.getMutableInstance(Player::LEVEL().mIDValue);
-    int                  newLvl  = int(ref.mPtr->mCurrentValue) + lvl;
+    int                  fixLvl  = lvl;
+    if (fixLvl < 0) fixLvl = 0; // Might be negative, we don't want that.
+    int                  newLvl  = int(ref.mPtr->mCurrentValue) + fixLvl;
 
     if (scoreboard && xpObjective) {
         ScoreboardId const& id = scoreboard->getScoreboardId(*this); // *this = Player
