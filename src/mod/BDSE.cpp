@@ -233,6 +233,7 @@ bool BDSE::enable() {
 
     AchievementsWillBeDisabledHook::hook();
     DisableAchievementsHook::hook();
+    PlayerSkinPacketHook::hook();
     PlayerAddLevelHook::hook();
 
     auto& bus = ll::event::EventBus::getInstance();
@@ -381,6 +382,7 @@ bool BDSE::disable() {
     freeCamera::FreeCameraManager::freecameraHook(false);
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
+    PlayerSkinPacketHook::unhook();
     PlayerAddLevelHook::unhook();
 
     auto& bus = ll::event::EventBus::getInstance();
