@@ -21,6 +21,7 @@
 #include "mc/world/level/Tick.h"
 
 #include "gmlib/mc/network/BinaryStream.h"
+#include "gmlib/mc/world/actor/Player.h"
 
 namespace bds_essentials::freeCamera {
 
