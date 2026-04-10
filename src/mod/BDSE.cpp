@@ -193,6 +193,10 @@ bool BDSE::enable() {
         }
     );
 
+    BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
+    Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
+    BDSE::getInstance().getSelf().getLogger().info("The id of Glass: {}", glass.computeRawSerializationIdHashForNetwork());
+
     ll::service::getLevel()->getLevelData().mAchievementsDisabled = false;
     mScoreboard = &ll::service::getLevel()->getScoreboard();
 

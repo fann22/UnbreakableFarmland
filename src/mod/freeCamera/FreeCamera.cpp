@@ -40,7 +40,7 @@ void SendFakePlayerPacket(Player* pl) {
     pkt1.mUuid            = randomUuid;
     pl->sendNetworkPacket(pkt1);
 
-    auto ref = pl->mSkin;
+    auto& ref = *pl->mSkin;
     if (!ref.mSkinImpl) return;
 
     auto& skinImpl = **ref.mSkinImpl;
