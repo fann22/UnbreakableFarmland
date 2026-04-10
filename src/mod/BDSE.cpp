@@ -69,6 +69,28 @@
 
 namespace bds_essentials {
 
+LL_AUTO_TYPE_INSTANCE_HOOK(
+    PlayerSkinPacketHook,
+    ll::memory::HookPriority::Normal,
+    PlayerSkinPacket,
+    &PlayerSkinPacket::$_read,
+    ::Bedrock::Result<void>,
+    ::ReadOnlyBinaryStream& stream
+) {
+    auto result = origin(stream);
+
+    if (freeCamera::FreeCameraManager::getInstance().cachedSkinPacket == nullptr) {
+        auto* buf = reinterpret_cast<PlayerSkinPacket*>(
+            ::operator new(sizeof(PlayerSkinPacket))
+        );
+        std::memcpy(buf, this, sizeof(PlayerSkinPacket));
+        freeCamera::FreeCameraManager::getInstance().cachedSkinPacket = buf;
+        BDSE::getInstance().getSelf().getLogger().info("PlayerSkinPacket cached!");
+    }
+
+    return result;
+}
+
 LL_TYPE_INSTANCE_HOOK(
     PlayerAddLevelHook,
     ll::memory::HookPriority::Normal,
@@ -380,27 +402,5 @@ bool BDSE::disable() {
 }
 
 } // namespace bds_essentials
-
-LL_AUTO_TYPE_INSTANCE_HOOK(
-    PlayerSkinPacketHook,
-    ll::memory::HookPriority::Normal,
-    PlayerSkinPacket,
-    &PlayerSkinPacket::$_read,
-    ::Bedrock::Result<void>,
-    ::ReadOnlyBinaryStream& stream
-) {
-    auto result = origin(stream);
-
-    if (freeCamera::FreeCameraManager::getInstance().cachedSkinPacket == nullptr) {
-        auto* buf = reinterpret_cast<PlayerSkinPacket*>(
-            ::operator new(sizeof(PlayerSkinPacket))
-        );
-        std::memcpy(buf, this, sizeof(PlayerSkinPacket));
-        freeCamera::FreeCameraManager::getInstance().cachedSkinPacket = buf;
-        BDSE::getInstance().getSelf().getLogger().info("PlayerSkinPacket cached!");
-    }
-
-    return result;
-}
 
 LL_REGISTER_MOD(bds_essentials::BDSE, bds_essentials::BDSE::getInstance());
