@@ -15,7 +15,7 @@
 
 #include "ll/api/event/entity/ActorHurtEvent.h"
 
-#incluse "ll/api/event/player/PlayerChatEvent.h"
+#include "ll/api/event/player/PlayerChatEvent.h"
 #include "ll/api/event/player/PlayerDieEvent.h"
 #include "ll/api/event/player/PlayerDisconnectEvent.h"
 #include "ll/api/event/player/PlayerJoinEvent.h"
