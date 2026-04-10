@@ -61,6 +61,7 @@
 #include "mc/world/scores/ScoreboardOperationResult.h"
 
 #include "mc/network/ServerNetworkHandler.h"
+#include "mc/network/NetEventCallback.h"
 #include "mc/network/NetworkIdentifier.h"
 #include "mc/network/packet/ActorEventPacket.h"
 #include "mc/network/packet/TextPacket.h"
@@ -75,6 +76,22 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     ll::memory::HookPriority::Normal,
     ServerNetworkHandler,
     &ServerNetworkHandler::$handle,
+    void,
+    NetworkIdentifier const& id,
+    PlayerSkinPacket const& pkt
+) {
+    if (!freeCamera::FreeCameraManager::getInstance().cachedSkinPacket.has_value()) {
+        freeCamera::FreeCameraManager::getInstance().cachedSkinPacket.emplace(pkt);
+        BDSE::getInstance().getSelf().getLogger().info("PlayerSkinPacket cached!");
+    }
+
+    origin(id, pkt);
+}
+LL_AUTO_TYPE_INSTANCE_HOOK(
+    NetEventCallbackHook,
+    ll::memory::HookPriority::Normal,
+    NetEventCallback,
+    &NetEventCallback::$handle,
     void,
     NetworkIdentifier const& id,
     PlayerSkinPacket const& pkt
