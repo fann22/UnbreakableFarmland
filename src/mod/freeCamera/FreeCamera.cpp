@@ -44,7 +44,7 @@ void SendFakePlayerPacket(Player* pl) {
     auto& ref = *pl->mSkin;
     if (!ref.mSkinImpl) return;
 
-    auto& skinImpl = **ref.mSkinImpl;
+    SerializedSkinImpl& skinImpl = ref.mSkinImpl->mObject;
     gmlib::GMBinaryStream bs;
     bs.writePacketHeader(MinecraftPacketIds::PlayerSkin);
     bs.writeUuid(randomUuid);
