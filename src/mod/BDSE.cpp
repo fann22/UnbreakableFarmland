@@ -75,7 +75,7 @@
 
 namespace bds_essentials {
 
-LL_AUTO_TYPE_INSTANCE_HOOK(
+LL_TYPE_INSTANCE_HOOK(
     NetEventCallbackHook,
     ll::memory::HookPriority::Normal,
     NetEventCallback,
@@ -239,6 +239,7 @@ bool BDSE::enable() {
     mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
     mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Descending);
 
+    NetEventCallbackHook::hook();
     AchievementsWillBeDisabledHook::hook();
     DisableAchievementsHook::hook();
     PlayerAddLevelHook::hook();
@@ -355,6 +356,7 @@ bool BDSE::disable() {
     gRunning = false;
 
     freeCamera::FreeCameraManager::freecameraHook(false);
+    NetEventCallbackHook::unhook();
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();
