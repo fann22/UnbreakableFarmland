@@ -67,12 +67,35 @@
 #include "mc/network/NetEventCallback.h"
 #include "mc/network/NetworkIdentifier.h"
 #include "mc/network/packet/ActorEventPacket.h"
+#include "mc/network/packet/UpdateBlockPacket.h"
 #include "mc/network/packet/TextPacket.h"
 #include "mc/network/packet/PlayerSkinPacket.h"
 #include "mc/network/packet/PlaySoundPacket.h"
 #include "mc/network/packet/PlaySoundPacketPayload.h"
 
 namespace bds_essentials {
+
+LL_AUTO_TYPE_INSTANCE_HOOK(
+    NetEventCallbackHook,
+    ll::memory::HookPriority::Normal,
+    NetEventCallback,
+    &NetEventCallback::$handle,
+    void,
+    NetworkIdentifier const& id,
+    std::shared_ptr<::UpdateBlockPacket> pkt
+) {
+    if (pkt) {
+        BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt->mRuntimeId);
+        BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
+        Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
+        if (pkt->mRuntimeId == glass.computeRawSerializationIdHashForNetwork()) {
+            Block const& glass = blockReg->getDefaultBlockState("minecraft:dirt");
+            pkt->mRuntimeId = glass.computeRawSerializationIdHashForNetwork();
+        }
+    }
+
+    origin(id, pkt);
+}
 
 LL_TYPE_INSTANCE_HOOK(
     PlayerAddLevelHook,
@@ -194,10 +217,6 @@ bool BDSE::enable() {
             return;
         }
     );
-
-    BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
-    Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
-    BDSE::getInstance().getSelf().getLogger().info("The id of Glass: {}", glass.computeRawSerializationIdHashForNetwork());
 
     ll::service::getLevel()->getLevelData().mAchievementsDisabled = false;
     mScoreboard = &ll::service::getLevel()->getScoreboard();
