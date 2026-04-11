@@ -49,6 +49,8 @@
 #include "mc/world/item/registry/ItemRegistryRef.h"
 #include "mc/world/level/ILevel.h"
 #include "mc/world/level/Level.h"
+#include "mc/world/level/block/Block.h"
+#include "mc/world/level/block/registry/BlockTypeRegistry.h"
 #include "mc/world/level/storage/LevelData.h"
 
 #include "mc/world/scores/DisplayObjective.h"
