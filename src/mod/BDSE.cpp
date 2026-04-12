@@ -68,6 +68,7 @@
 #include "mc/network/NetworkIdentifier.h"
 #include "mc/network/packet/ActorEventPacket.h"
 #include "mc/network/packet/UpdateBlockPacket.h"
+#include "mc/network/packet/UpdateBlockSyncedPacket.h"
 #include "mc/network/packet/TextPacket.h"
 #include "mc/network/packet/PlayerSkinPacket.h"
 #include "mc/network/packet/PlaySoundPacket.h"
@@ -75,7 +76,7 @@
 
 namespace bds_essentials {
 
-LL_TYPE_INSTANCE_HOOK(
+LL_AUTO_TYPE_INSTANCE_HOOK(
     NetEventCallbackHook,
     ll::memory::HookPriority::Normal,
     NetEventCallback,
@@ -83,6 +84,27 @@ LL_TYPE_INSTANCE_HOOK(
     void,
     NetworkIdentifier const& id,
     std::shared_ptr<::UpdateBlockPacket> pkt
+) {
+    if (pkt) {
+        BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt->mRuntimeId);
+        BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
+        Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
+        if (pkt->mRuntimeId == glass.computeRawSerializationIdHashForNetwork()) {
+            Block const& glass = blockReg->getDefaultBlockState("minecraft:dirt");
+            pkt->mRuntimeId = glass.computeRawSerializationIdHashForNetwork();
+        }
+    }
+
+    origin(id, pkt);
+}
+LL_AUTO_TYPE_INSTANCE_HOOK(
+    NetEventCallbackHook2,
+    ll::memory::HookPriority::Normal,
+    NetEventCallback,
+    &NetEventCallback::$handle,
+    void,
+    NetworkIdentifier const& id,
+    std::shared_ptr<::UpdateBlockSyncedPacket> pkt
 ) {
     if (pkt) {
         BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt->mRuntimeId);
@@ -239,7 +261,6 @@ bool BDSE::enable() {
     mXPObjective = mScoreboard->addObjective("MostLVL", "•> Most Level <•", *criteria);
     mScoreboard->setDisplayObjective(Scoreboard::DISPLAY_SLOT_SIDEBAR(), *mXPObjective, ObjectiveSortOrder::Descending);
 
-    NetEventCallbackHook::hook();
     AchievementsWillBeDisabledHook::hook();
     DisableAchievementsHook::hook();
     PlayerAddLevelHook::hook();
@@ -356,7 +377,6 @@ bool BDSE::disable() {
     gRunning = false;
 
     freeCamera::FreeCameraManager::freecameraHook(false);
-    NetEventCallbackHook::unhook();
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();
