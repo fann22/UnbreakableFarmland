@@ -8,7 +8,7 @@ namespace mipmap {
 class HttpSender {
 public:
     struct Config {
-        std::string host = "127.0.0.1";
+        std::string host = "0.0.0.0";
         int         port = 8080;
     };
 
