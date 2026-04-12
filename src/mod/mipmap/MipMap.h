@@ -5,25 +5,12 @@
 #include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/memory/Hook.h"
+#include "mc/world/level/storage/DBChunkStorage.h"
+#include "mc/world/level/chunk/LevelChunk.h"
 #include <memory>
 #include <atomic>
 
-#include "mc/world/level/storage/DBChunkStorage.h"
-
 namespace mipmap {
-
-LL_TYPE_INSTANCE_HOOK(
-    MipMapChunkLoadHook,
-    ll::memory::HookPriority::Normal,
-    DBChunkStorage,
-    &DBChunkStorage::$loadChunk,
-    void,
-    LevelChunk& lc,
-    bool forceImmediateReplacementDataLoad
-) {
-    origin(lc, forceImmediateReplacementDataLoad);
-    mipmap::MipMap::getInstance().getCollector().onChunkLoaded(lc);
-}
 
 class MipMap {
 public:
@@ -44,22 +31,18 @@ public:
         schedulePlayerTick();
     }
 
-    void shutdown() {
-        mRunning = false;
-    }
+    void shutdown() { mRunning = false; }
 
     ChunkCollector& getCollector() { return *mCollector; }
 
 private:
     void schedulePlayerTick() {
         if (!mRunning) return;
-
-        // 5 detik = 5000ms
         ll::thread::ServerThreadExecutor::getDefault().executeAfter(
             [this]() {
                 if (!mRunning) return;
                 mPlayerTracker->tick();
-                schedulePlayerTick(); // reschedule
+                schedulePlayerTick();
             },
             std::chrono::milliseconds(5000)
         );
@@ -72,3 +55,17 @@ private:
 };
 
 } // namespace mipmap
+
+// Hook di luar namespace, setelah class MipMap didefinisikan
+LL_TYPE_INSTANCE_HOOK(
+    MipMapChunkLoadHook,
+    ll::memory::HookPriority::Normal,
+    DBChunkStorage,
+    &DBChunkStorage::$loadChunk,
+    void,
+    LevelChunk& lc,
+    bool forceImmediateReplacementDataLoad
+) {
+    origin(lc, forceImmediateReplacementDataLoad);
+    mipmap::MipMap::getInstance().getCollector().onChunkLoaded(lc);
+}
