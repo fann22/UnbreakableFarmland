@@ -21,7 +21,7 @@ public:
                 httplib::Client cli(mConfig.host, mConfig.port);
                 cli.set_connection_timeout(3);
                 cli.set_read_timeout(3);
-                cli.Post("/chunks", body, "application/json");
+                cli.Post("/api/chunks-data", body, "application/json");
             } catch (...) {}
         }).detach();
     }
@@ -32,7 +32,7 @@ public:
                 httplib::Client cli(mConfig.host, mConfig.port);
                 cli.set_connection_timeout(3);
                 cli.set_read_timeout(3);
-                cli.Post("/players", body, "application/json");
+                cli.Post("/api/players-data", body, "application/json");
             } catch (...) {}
         }).detach();
     }
