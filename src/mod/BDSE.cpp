@@ -204,7 +204,6 @@ static std::atomic<bool> gRunning   = false;
 
 bool BDSE::load() {
     // getSelf().getLogger().debug("Loading...");
-    mipmap::MipMap::getInstance().init();
     return true;
 }
 
@@ -267,7 +266,6 @@ bool BDSE::enable() {
     AchievementsWillBeDisabledHook::hook();
     DisableAchievementsHook::hook();
     PlayerAddLevelHook::hook();
-    MipMapChunkLoadHook::hook();
 
     auto& bus = ll::event::EventBus::getInstance();
 
@@ -384,8 +382,7 @@ bool BDSE::disable() {
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();
-    MipMapChunkLoadHook::unhook();
-    mipmap::MipMap::getInstance().shutdown();
+    MipMapChunkLoadHook::unhook();;
 
     auto& bus = ll::event::EventBus::getInstance();
 
