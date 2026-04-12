@@ -1,7 +1,9 @@
 #include "mod/BDSE.h"
 
+#include "mipmap/MipMap.h"
 #include "freeCamera/FreeCamera.h"
 #include "gsl/pointers"
+
 #include "ll/api/event/EventBus.h"
 #include "ll/api/event/ListenerBase.h"
 #include "ll/api/io/LogLevel.h"
