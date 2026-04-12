@@ -1,6 +1,6 @@
 #include "MipMap.h"
 #include "mc/world/level/storage/DBChunkStorage.h"
-#include <ll/api/memory/Hook.h>
+#include "ll/api/memory/Hook.h"
 
 LL_TYPE_INSTANCE_HOOK(
     MipMapChunkLoadHook,

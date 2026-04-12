@@ -1,10 +1,10 @@
 #pragma once
 #include "HttpSender.h"
 #include "mc/world/actor/player/Player.h"
-#include "mc/world/actor/player/ServerPlayer.h"
 #include "mc/world/actor/player/SkinImage.h"
 #include "mc/world/actor/player/SerializedSkinImpl.h"
-#include <ll/api/service/Bedrock.h>
+#include "mc/server/ServerPlayer.h"
+#include "ll/api/service/Bedrock.h"
 
 namespace mipmap {
 
