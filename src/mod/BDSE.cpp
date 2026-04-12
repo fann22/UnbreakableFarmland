@@ -16,6 +16,7 @@
 #include "ll/api/event/entity/ActorHurtEvent.h"
 
 #include "ll/api/event/player/PlayerChatEvent.h"
+#include "ll/api/event/player/PlayerConnectEvent.h"
 #include "ll/api/event/player/PlayerDieEvent.h"
 #include "ll/api/event/player/PlayerDisconnectEvent.h"
 #include "ll/api/event/player/PlayerJoinEvent.h"
@@ -75,7 +76,7 @@
 #include "mc/network/packet/PlaySoundPacketPayload.h"
 
 namespace bds_essentials {
-
+/*
 LL_AUTO_TYPE_INSTANCE_HOOK(
     NetEventCallbackHook,
     ll::memory::HookPriority::Normal,
@@ -83,15 +84,15 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     &NetEventCallback::$handle,
     void,
     NetworkIdentifier const& id,
-    std::shared_ptr<::UpdateBlockPacket> pkt
+    std::shared_ptr<UpdateBlockPacket> pkt
 ) {
     if (pkt) {
         BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt->mRuntimeId);
         BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
         Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
         if (pkt->mRuntimeId == glass.computeRawSerializationIdHashForNetwork()) {
-            Block const& glass = blockReg->getDefaultBlockState("minecraft:dirt");
-            pkt->mRuntimeId = glass.computeRawSerializationIdHashForNetwork();
+            Block const& dirt = blockReg->getDefaultBlockState("minecraft:dirt");
+            pkt->mRuntimeId = dirt.computeRawSerializationIdHashForNetwork();
         }
     }
 
@@ -104,20 +105,20 @@ LL_AUTO_TYPE_INSTANCE_HOOK(
     &NetEventCallback::$handle,
     void,
     NetworkIdentifier const& id,
-    std::shared_ptr<::UpdateBlockSyncedPacket> pkt
+    std::shared_ptr<UpdateBlockSyncedPacket> pkt
 ) {
     if (pkt) {
         BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt->mRuntimeId);
         BlockTypeRegistry* blockReg = ll::service::getLevel()->getBlockTypeRegistry().get();
         Block const& glass = blockReg->getDefaultBlockState("minecraft:glass");
         if (pkt->mRuntimeId == glass.computeRawSerializationIdHashForNetwork()) {
-            Block const& glass = blockReg->getDefaultBlockState("minecraft:dirt");
-            pkt->mRuntimeId = glass.computeRawSerializationIdHashForNetwork();
+            Block const& dirt = blockReg->getDefaultBlockState("minecraft:dirt");
+            pkt->mRuntimeId = dirt.computeRawSerializationIdHashForNetwork();
         }
     }
 
     origin(id, pkt);
-}
+}*/
 
 LL_TYPE_INSTANCE_HOOK(
     PlayerAddLevelHook,
@@ -367,6 +368,25 @@ bool BDSE::enable() {
             TextPacket::createRawMessage(message).sendToClients();
             event.cancel();
         })
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ll::event::PlayerConnectEvent>([](ll::event::PlayerConnectEvent& event) {
+            BDSE::getInstance().getSelf().getLogger().info("Connected player: {}", event.player.getRealName());
+            event.cancel();
+        })
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ila::mc::SendPacketBeforeEvent<UpdateBlockPacket>>(
+            [](ila::mc::SendPacketBeforeEvent<UpdateBlockPacket>& event) {
+                UpdateBlockPacket& pkt = event.packet();
+
+                BDSE::getInstance().getSelf().getLogger().info("Sending packet with mRuntimeId: {}", pkt.mRuntimeId);
+            }
+        )
     );
 
     // getSelf().getLogger().info("loaded.");
