@@ -372,14 +372,6 @@ bool BDSE::enable() {
 
     gListeners.insert(
         gListeners.begin(),
-        bus.emplaceListener<ll::event::PlayerConnectEvent>([](ll::event::PlayerConnectEvent& event) {
-            BDSE::getInstance().getSelf().getLogger().info("Connected player: {}", event.self().getRealName());
-            event.cancel();
-        })
-    );
-
-    gListeners.insert(
-        gListeners.begin(),
         bus.emplaceListener<ila::mc::SendPacketBeforeEvent<UpdateBlockPacket>>(
             [](ila::mc::SendPacketBeforeEvent<UpdateBlockPacket>& event) {
                 UpdateBlockPacket& pkt = event.packet();
