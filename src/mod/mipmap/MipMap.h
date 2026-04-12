@@ -4,6 +4,7 @@
 #include "core/PlayerTracker.h"
 #include "ll/api/thread/ServerThreadExecutor.h"
 #include "ll/api/chrono/GameChrono.h"
+#include "ll/api/memory/Hook.h"
 #include <memory>
 #include <atomic>
 
