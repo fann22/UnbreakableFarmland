@@ -383,8 +383,8 @@ bool BDSE::enable() {
             Block const&    newBlock = event.newBlock();
 
             // Contoh: sembunyikan diamond ore, kirim stone ke semua client
-            if (newBlock.getTypeName() == "minecraft:diamond_ore") {
-                auto const& stone = Block::tryGetFromRegistry("minecraft:stone");
+            if (newBlock.getTypeName() == "minecraft:glass") {
+                auto const& stone = Block::tryGetFromRegistry("minecraft:netherite_block");
                 if (!stone) return;
 
                 UpdateBlockPacket pkt;
