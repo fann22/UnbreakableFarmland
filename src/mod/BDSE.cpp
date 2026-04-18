@@ -1,6 +1,5 @@
 #include "mod/BDSE.h"
 
-#include "mipmap/MipMap.h"
 #include "freeCamera/FreeCamera.h"
 #include "gsl/pointers"
 
@@ -386,7 +385,6 @@ bool BDSE::disable() {
     AchievementsWillBeDisabledHook::unhook();
     DisableAchievementsHook::unhook();
     PlayerAddLevelHook::unhook();
-    MipMapChunkLoadHook::unhook();;
 
     auto& bus = ll::event::EventBus::getInstance();
 
