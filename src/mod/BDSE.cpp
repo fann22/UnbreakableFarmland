@@ -18,6 +18,8 @@
 
 #include "ll/api/event/entity/ActorHurtEvent.h"
 
+#include "ll/api/event/world/BlockChangedEvent.h"
+
 #include "ll/api/event/player/PlayerChatEvent.h"
 #include "ll/api/event/player/PlayerConnectEvent.h"
 #include "ll/api/event/player/PlayerDieEvent.h"
@@ -53,6 +55,7 @@
 #include "mc/world/item/registry/ItemRegistryRef.h"
 #include "mc/world/level/ILevel.h"
 #include "mc/world/level/Level.h"
+#include "mc/world/level/BlockPos.h"
 #include "mc/world/level/block/Block.h"
 #include "mc/world/level/block/registry/BlockTypeRegistry.h"
 #include "mc/world/level/storage/LevelData.h"
@@ -370,6 +373,27 @@ bool BDSE::enable() {
             auto message = "§b" + event.self().getRealName() + "§f: " + event.message();
             TextPacket::createRawMessage(message).sendToClients();
             event.cancel();
+        })
+    );
+
+    gListeners.insert(
+        gListeners.begin(),
+        bus.emplaceListener<ll::event::BlockChangedEvent>([](ll::event::BlockChangedEvent& event) {
+            BlockPos const& pos      = event.pos();
+            Block const&    newBlock = event.newBlock();
+
+            // Contoh: sembunyikan diamond ore, kirim stone ke semua client
+            if (newBlock.getTypeName() == "minecraft:diamond_ore") {
+                auto const& stone = Block::tryGetFromRegistry("minecraft:stone");
+                if (!stone) return;
+
+                UpdateBlockPacket pkt;
+                pkt.mPos         = pos;
+                pkt.mRuntimeId   = stone.mSerializationIdHashForNetwork;
+                pkt.mLayer       = 0;
+                pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
+                pkt.sendToClients();
+            }
         })
     );
 
