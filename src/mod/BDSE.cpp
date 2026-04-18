@@ -81,6 +81,9 @@
 #include "mc/network/packet/PlaySoundPacket.h"
 #include "mc/network/packet/PlaySoundPacketPayload.h"
 
+#include <ll/api/chrono/GameChrono.h>
+#include <ll/api/thread/ServerThreadExecutor.h>
+
 namespace bds_essentials {
 /*
 LL_AUTO_TYPE_INSTANCE_HOOK(
@@ -382,17 +385,21 @@ bool BDSE::enable() {
             BlockPos const& pos      = event.pos();
             Block const&    newBlock = event.newBlock();
 
-            // Contoh: sembunyikan diamond ore, kirim stone ke semua client
             if (newBlock.getTypeName() == "minecraft:glass") {
-                auto const& stone = Block::tryGetFromRegistry(std::string_view("minecraft:netherite_block"));
-                if (!stone) return;
+                auto const& replacement = Block::tryGetFromRegistry(std::string_view("minecraft:netherite_block"));
+                if (!replacement) return;
 
-                UpdateBlockPacket pkt;
-                pkt.mPos         = pos;
-                pkt.mRuntimeId   = (*stone).mSerializationIdHashForNetwork;
-                pkt.mLayer       = 0;
-                pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
-                pkt.sendToClients();
+                ll::thread::ServerThreadExecutor::getDefault().executeAfter(
+                    []() {
+                        UpdateBlockPacket pkt;
+                        pkt.mPos         = pos;
+                        pkt.mRuntimeId   = (*replacement).mSerializationIdHashForNetwork;
+                        pkt.mLayer       = 0;
+                        pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
+                        pkt.sendToClients();
+                    },
+                    ll::chrono::ticks(4)
+                )
             }
         })
     );
