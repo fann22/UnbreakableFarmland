@@ -467,36 +467,45 @@ bool BDSE::disable() {
     return true;
 }
 
-void drawChunkGrid(Player& player, int density = 16, int heightRange = 5) {
+void drawChunkGrid(Player& player) {
     Vec3 pos = player.getPosition();
+    Dimension* dim = &player.getDimension();
+    
     int chunkX = (int)std::floor(pos.x / 16);
     int chunkZ = (int)std::floor(pos.z / 16);
 
     float startX = (chunkX * 16) - 0.5f;
     float startZ = (chunkZ * 16) - 0.5f;
-    float minY = pos.y - heightRange;
-    float maxY = pos.y + heightRange;
+    float minY = pos.y - 5.0f;
+    float maxY = pos.y + 5.0f;
 
-    int verticalSteps = heightRange * 2; // 1 particle per block secara vertikal
+    int density = 16;
+    int verticalSteps = 10;
 
-    // Lines sepanjang X (fixed Z)
+    auto spawn = [&](Vec3 p) {
+        player.getLevel().spawnParticleEffect(
+            "minecraft:dragon_breath_trail",
+            p,
+            dim
+        );
+    };
+
     for (int gz = 0; gz <= 8; gz++) {
         float z = startZ + (gz * 2);
         for (int yi = 0; yi <= verticalSteps; yi++) {
             float y = minY + ((maxY - minY) * yi / verticalSteps);
             for (int i = 0; i <= density; i++) {
-                spawnParticle({ startX + (16.0f * i / density), y, z }, player);
+                spawn({ startX + (16.0f * i / density), y, z });
             }
         }
     }
 
-    // Lines sepanjang Z (fixed X)
     for (int gx = 0; gx <= 8; gx++) {
         float x = startX + (gx * 2);
         for (int yi = 0; yi <= verticalSteps; yi++) {
             float y = minY + ((maxY - minY) * yi / verticalSteps);
             for (int i = 0; i <= density; i++) {
-                spawnParticle({ x, y, startZ + (16.0f * i / density) }, player);
+                spawn({ x, y, startZ + (16.0f * i / density) });
             }
         }
     }
