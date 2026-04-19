@@ -201,10 +201,9 @@ BDSE& BDSE::getInstance() {
 
 static std::vector<ll::event::ListenerPtr> gListeners;
 static std::vector<std::string> gMotdMessages = {
-    "•> 𝗔𝗻𝗼𝗺𝗮𝗹𝘆 𝗦𝘂𝗿𝘃𝗶𝘃𝗮𝗹! <•",
-    "•> 𝗗𝗘𝗔𝗗 = 𝗚𝗔𝗬 <•",
     "•> 𝗩𝗮𝗻𝗶𝗹𝗹𝗮 𝗦𝗲𝗿𝘃𝗲𝗿 <•",
-    "•> 𝟭𝟬𝟰.𝟮𝟰𝟴.𝟭𝟱𝟰.𝟮𝟯𝟬 <•"
+    "•> play.anomaly.bond <•",
+    "•> port: 25600 <•"
 };
 static std::atomic<int>  gMotdIndex = 0;
 static std::atomic<bool> gRunning   = false;
