@@ -226,8 +226,10 @@ bool BDSE::enable() {
     ll::thread::ThreadPoolExecutor::getDefault().execute([]() {
         while (gRunning) {
             ll::service::getLevel()->forEachPlayer([](Player& player) -> bool {
-                auto guid = player.getNetworkIdentifier().mGuid.g;
-                if (ChunkBorderList.count(guid)) drawChunkGrid(player);
+                try {
+                    auto guid = player.getNetworkIdentifier().mGuid.g;
+                    if (ChunkBorderList.count(guid)) drawChunkGrid(player);
+                } catch {}
                 return true;
             });
             std::this_thread::sleep_for(std::chrono::milliseconds(800));
