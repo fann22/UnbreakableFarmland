@@ -492,7 +492,7 @@ bool BDSE::enable() {
                     [pos, replacement](){
                         UpdateBlockPacket pkt;
                         pkt.mPos         = pos;
-                        pkt.mRuntimeId   = (*replacement).mSerializationIdHashForNetwork;
+                        pkt.mRuntimeId   = (*replacement).computeRawSerializationIdHashForNetwork();
                         pkt.mLayer       = 0;
                         pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
                         pkt.sendToClients();
