@@ -92,8 +92,8 @@ void drawChunkBorder(Player& player) {
     int chunkX = (int)std::floor(pos.x / 16);
     int chunkZ = (int)std::floor(pos.z / 16);
 
-    float minX = (chunkX * 16) - 0f;
-    float minZ = (chunkZ * 16) - 0f;
+    float minX = (chunkX * 16) - 0.0f;
+    float minZ = (chunkZ * 16) - 0.0f;
     float maxX = (chunkX * 16) + 16f;
     float maxZ = (chunkZ * 16) + 16f;
     float minY = pos.y - 5.0f;
