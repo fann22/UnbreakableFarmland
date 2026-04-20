@@ -99,12 +99,12 @@ void drawChunkBorder(Player& player) {
     float minY = pos.y - 5.0f;
     float maxY = pos.y + 5.0f;
 
-    int density       = 32;
+    int density       = 16;
     int verticalSteps = 10;
 
     auto spawn = [&](Vec3 p) {
         player.getLevel().spawnParticleEffect(
-            "minecraft:glow_particle", p, &player.getDimension()
+            "minecraft:witchspell", p, &player.getDimension()
         );
     };
 
