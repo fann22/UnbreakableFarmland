@@ -92,10 +92,10 @@ void drawChunkBorder(Player& player) {
     int chunkX = (int)std::floor(pos.x / 16);
     int chunkZ = (int)std::floor(pos.z / 16);
 
-    float minX = (chunkX * 16) - 0.5f;
-    float minZ = (chunkZ * 16) - 0.5f;
-    float maxX = (chunkX * 16) + 16.5f;
-    float maxZ = (chunkZ * 16) + 16.5f;
+    float minX = (chunkX * 16) - 0f;
+    float minZ = (chunkZ * 16) - 0f;
+    float maxX = (chunkX * 16) + 16f;
+    float maxZ = (chunkZ * 16) + 16f;
     float minY = pos.y - 5.0f;
     float maxY = pos.y + 5.0f;
 
@@ -199,7 +199,7 @@ static std::vector<ll::event::ListenerPtr> gListeners;
 static std::vector<std::string> gMotdMessages = {
     "•> 𝗩𝗮𝗻𝗶𝗹𝗹𝗮 𝗦𝗲𝗿𝘃𝗲𝗿 <•",
     "•> play.anomaly.bond <•",
-    "•> port: 25600 <•"
+    "•> PORT: 25600 <•"
 };
 static std::atomic<int>  gMotdIndex = 0;
 static std::atomic<bool> gRunning   = false;
@@ -232,7 +232,7 @@ bool BDSE::enable() {
                 });
             });
     
-            std::this_thread::sleep_for(std::chrono::milliseconds(800));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         }
     });
 
