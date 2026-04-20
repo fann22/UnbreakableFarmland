@@ -84,15 +84,16 @@
 #include <ll/api/chrono/GameChrono.h>
 #include <ll/api/thread/ServerThreadExecutor.h>
 
+#include "mc/world/level/dimension/Dimension.h"
 #include "mc/network/packet/DebugDrawerPacket.h"
 #include "mc/network/packet/ShapeDataPayload.h"
 #include "mc/network/packet/LineDataPayload.h"
 #include "mc/scripting/modules/minecraft/debugdrawer/ScriptDebugShapeType.h"
 #include "mc/network/packet/cerealize/core/SerializationMode.h"
 
-namespace bds_essentials {
-
 ShapeDataPayload::ShapeDataPayload() { mNetworkId = 0; }
+
+namespace bds_essentials {
 
 static std::atomic<uint64_t> sNextShapeId{UINT64_MAX};
 static std::unordered_map<unsigned long long, std::pair<int,int>>        gLastChunk;
@@ -129,7 +130,7 @@ void sendLineToPlayer(Player& player, Vec3 const& begin, Vec3 const& end, mce::C
     shape.mShapeType        = ScriptModuleDebugUtilities::ScriptDebugShapeType::Line;
     shape.mLocation         = begin;
     shape.mColor            = color;
-    shape.mDimensionId      = player.getDimension().getDimensionId();
+    shape.mDimensionId      = player.getDimension().mId;
     shape.mExtraDataPayload = LineDataPayload{.mEndLocation = end};
     pkt.mShapes->emplace_back(std::move(shape));
 
