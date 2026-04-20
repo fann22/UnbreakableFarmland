@@ -493,33 +493,11 @@ bool BDSE::enable() {
                         UpdateBlockPacket pkt;
                         pkt.mPos         = pos;
                         pkt.mLayer       = 0;
-                        pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
-                        pkt.mRuntimeId   = (*replacement).mSerializationIdHashForNetwork;
-                        pkt.sendToClients();
-                    },
-                    ll::chrono::ticks(4)
-                );
-                ll::thread::ServerThreadExecutor::getDefault().executeAfter(
-                    [pos, replacement](){
-                        UpdateBlockPacket pkt;
-                        pkt.mPos         = pos;
-                        pkt.mLayer       = 0;
-                        pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
-                        pkt.mRuntimeId   = (*replacement).mSerializationIdHash;
-                        pkt.sendToClients();
-                    },
-                    ll::chrono::ticks(24)
-                );
-                ll::thread::ServerThreadExecutor::getDefault().executeAfter(
-                    [pos, replacement](){
-                        UpdateBlockPacket pkt;
-                        pkt.mPos         = pos;
-                        pkt.mLayer       = 0;
-                        pkt.mUpdateFlags = 0b0011; // FLAG_NEIGHBORS | FLAG_NETWORK
+                        pkt.mUpdateFlags = 1;
                         pkt.mRuntimeId   = (*replacement).mNetworkId;
                         pkt.sendToClients();
                     },
-                    ll::chrono::ticks(48)
+                    ll::chrono::ticks(4)
                 );
             }
         })
