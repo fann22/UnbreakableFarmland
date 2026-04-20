@@ -223,20 +223,23 @@ bool BDSE::enable() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         }
     });
-    ll::thread::ServerThreadExecutor::getDefault().executeRepeat(
-        []() {
-            ll::service::getLevel()->forEachPlayer([](Player& player) -> bool {
-                try {
-                    auto guid = player.getNetworkIdentifier().mGuid.g;
-                    if (ChunkBorderList.count(guid)) drawChunkGrid(player);
-                } catch (std::exception& e) {
-                    BDSE::getInstance().getSelf().getLogger().error("drawChunkGrid error: {}", e.what());
-                }
-                return true;
+    ll::thread::ThreadPoolExecutor::getDefault().execute([]() {
+        while (gRunning) {
+            ll::thread::ServerThreadExecutor::getDefault().execute([]() {
+                ll::service::getLevel()->forEachPlayer([](Player& player) -> bool {
+                    try {
+                        auto guid = player.getNetworkIdentifier().mGuid.g;
+                        if (ChunkBorderList.count(guid)) drawChunkGrid(player);
+                    } catch (std::exception& e) {
+                        BDSE::getInstance().getSelf().getLogger().error("drawChunkGrid: {}", e.what());
+                    }
+                    return true;
+                });
             });
-        },
-        ll::chrono::ticks(16)
-    );
+    
+            std::this_thread::sleep_for(std::chrono::milliseconds(800));
+        }
+    });
 
     freeCamera::FreeCameraManager::freecameraHook(true);
     auto& cmd = ll::command::CommandRegistrar::getInstance(false).getOrCreateCommand("freecamera", "Toggle freecam.");
