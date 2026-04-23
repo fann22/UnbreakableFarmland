@@ -477,7 +477,7 @@ bool BDSE::enable() {
             event.cancel();
         })
     );
-
+/*
     gListeners.insert(
         gListeners.begin(),
         bus.emplaceListener<ll::event::BlockChangedEvent>([](ll::event::BlockChangedEvent& event) {
@@ -502,7 +502,7 @@ bool BDSE::enable() {
             }
         })
     );
-
+*/
     // getSelf().getLogger().info("loaded.");
     return true;
 }
