@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: xmake-io/github-action-setup-xmake@v1
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/AppData/Local/.xmake
@@ -30,7 +30,7 @@ jobs:
 
       - run: xmake -v -y
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-${{ matrix.target_type }}-windows-x64
           path: bin/
