@@ -100,34 +100,36 @@ static std::atomic<int>  gChunkBorderCount{0};
 // compare_exchange_strong ensures only one thread can transition false→true.
 static std::atomic<bool> gLoopRunning{false};
 
-// removeChunkBorder — must be called BEFORE erasing gShapeIds[guid].
-// Caller is responsible for holding gChunkBorderMtx if accessing shared maps
-// outside of server thread, or ensuring single-threaded access.
+// sendDeletePacket — kirim packet hapus shapes ke client berdasarkan vector IDs.
+// Tidak menyentuh gShapeIds sama sekali; ownership sepenuhnya di caller.
+static void sendDeletePacket(Player& player, std::vector<uint64_t> const& ids) {
+    if (ids.empty()) return;
+    DebugDrawerPacket pkt;
+    pkt.setSerializationMode(SerializationMode::CerealOnly);
+    for (auto id : ids) {
+        ShapeDataPayload shape;
+        shape.mNetworkId = id;
+        shape.mShapeType = std::nullopt; // nullopt = hapus shape di client
+        pkt.mShapes->emplace_back(std::move(shape));
+    }
+    pkt.sendTo(player);
+}
+
+// removeChunkBorder — ambil IDs dari gShapeIds, kirim delete packet, lalu erase entry.
+// Aman dipanggil dari server thread kapanpun (acquire lock sendiri).
 void removeChunkBorder(Player& player) {
     auto guid = player.getNetworkIdentifier().mGuid.g;
 
-    // FIX #3: lock before accessing gShapeIds to prevent data race with
-    // command handler or disconnect handler running on another thread.
-    std::unique_lock lock(gChunkBorderMtx);
-    auto it = gShapeIds.find(guid);
-    if (it == gShapeIds.end()) return;
-
-    // Copy IDs out, then release lock before doing packet I/O.
-    std::vector<uint64_t> ids = it->second;
-    gShapeIds.erase(it);
-    lock.unlock();
-
-    DebugDrawerPacket pkt;
-    pkt.setSerializationMode(SerializationMode::CerealOnly);
-
-    for (auto& id : ids) {
-        ShapeDataPayload shape;
-        shape.mNetworkId = id;
-        shape.mShapeType = std::nullopt; // nullopt = delete shape
-        pkt.mShapes->emplace_back(std::move(shape));
+    std::vector<uint64_t> ids;
+    {
+        std::lock_guard lock(gChunkBorderMtx);
+        auto it = gShapeIds.find(guid);
+        if (it == gShapeIds.end()) return;
+        ids = std::move(it->second); // ambil ownership
+        gShapeIds.erase(it);         // hapus dari map — sebelum unlock
     }
-
-    pkt.sendTo(player);
+    // Lock sudah dilepas, aman untuk I/O
+    sendDeletePacket(player, ids);
 }
 
 void updateChunkBorder(Player& player) {
@@ -136,18 +138,28 @@ void updateChunkBorder(Player& player) {
     int  chunkZ = (int)std::floor(pos.z / 16);
     auto guid   = player.getNetworkIdentifier().mGuid.g;
 
-    // lock gLastChunk access — it can be written by command handler
-    // (disable path) concurrently.
+    // Cek apakah player masih di chunk yang sama.
+    // Sekaligus ambil IDs lama untuk dihapus — semua dalam satu lock,
+    // sehingga tidak ada window antara "cek chunk" dan "ambil IDs lama".
+    std::vector<uint64_t> oldIds;
     {
         std::lock_guard lock(gChunkBorderMtx);
-        auto it = gLastChunk.find(guid);
-        if (it != gLastChunk.end() && it->second == std::make_pair(chunkX, chunkZ)) return;
-        gLastChunk[guid] = {chunkX, chunkZ};
+        auto& lastChunk = gLastChunk[guid];
+        if (lastChunk == std::make_pair(chunkX, chunkZ)) return; // belum pindah chunk
+        lastChunk = {chunkX, chunkZ};
+
+        // Ambil ownership IDs lama sekarang, saat masih di bawah lock
+        auto it = gShapeIds.find(guid);
+        if (it != gShapeIds.end()) {
+            oldIds = std::move(it->second);
+            gShapeIds.erase(it);
+        }
     }
 
-    // removeChunkBorder acquires its own lock internally.
-    removeChunkBorder(player);
+    // Kirim delete packet shapes lama — lock sudah dilepas
+    sendDeletePacket(player, oldIds);
 
+    // Bangun shapes baru
     float minX = (chunkX * 16);
     float minZ = (chunkZ * 16);
     float maxX = (chunkX * 16) + 16.0f;
@@ -159,8 +171,6 @@ void updateChunkBorder(Player& player) {
 
     DebugDrawerPacket pkt;
     pkt.setSerializationMode(SerializationMode::CerealOnly);
-
-    // Collect new shape IDs into a local vector, then store under lock.
     std::vector<uint64_t> newIds;
 
     auto addLine = [&](Vec3 const& begin, Vec3 const& end) {
@@ -196,13 +206,15 @@ void updateChunkBorder(Player& player) {
         addLine({maxX, y, minZ}, {maxX, y, maxZ}); // East
     }
 
-    // FIX #3: store new shape IDs under lock.
+    // Kirim shapes baru ke client dulu, baru simpan IDs-nya.
+    // Urutan ini penting: kalau server crash setelah sendTo tapi sebelum store,
+    // IDs hilang dan tidak ada leak di sisi client (shapes akan expire sendiri).
+    pkt.sendTo(player);
+
     {
         std::lock_guard lock(gChunkBorderMtx);
         gShapeIds[guid] = std::move(newIds);
     }
-
-    pkt.sendTo(player);
 }
 
 // FIX #1 + FIX (loop task stacking):
@@ -404,7 +416,7 @@ bool BDSE::enable() {
             updateChunkBorder(*player);
             output.success("§nChunk border§r §aenabled.");
         } else {
-            // call removeChunkBorder BEFORE erasing gShapeIds,
+            // FIX #2: call removeChunkBorder BEFORE erasing gShapeIds,
             // otherwise removeChunkBorder finds an empty map and sends no
             // delete packet — leaving the lines visible on the client.
             removeChunkBorder(*player); // sends delete packet & erases gShapeIds[guid]
@@ -495,7 +507,7 @@ bool BDSE::enable() {
 
             auto guid = event.self().getNetworkIdentifier().mGuid.g;
 
-            // removeChunkBorder first (needs gShapeIds intact),
+            // FIX #2: removeChunkBorder first (needs gShapeIds intact),
             // then erase bookkeeping data.
             bool hadBorder = false;
             {
