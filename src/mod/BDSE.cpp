@@ -217,21 +217,27 @@ void updateChunkBorder(Player& player) {
     }
 }
 
-// FIX #1 + FIX (loop task stacking):
-// - gLoopRunning prevents spawning duplicate loop threads.
-// - std::promise/future ensures we wait for the server thread task to finish
-//   before sleeping, so tasks never pile up in the server thread queue.
+// startChunkBorderLoop — dispatch tick ke server thread setiap 40ms.
+// Tidak pakai future.wait() karena ServerThreadExecutor adalah single-threaded
+// tick loop; memblok pool thread sambil nunggu server thread = deadlock.
+// Solusi: pakai atomic flag gTickPending untuk skip dispatch kalau tick
+// sebelumnya belum selesai — mencegah task numpuk tanpa blocking.
+static std::atomic<bool> gTickPending{false};
+
 void startChunkBorderLoop() {
     bool expected = false;
-    if (!gLoopRunning.compare_exchange_strong(expected, true)) return; // already running
+    if (!gLoopRunning.compare_exchange_strong(expected, true)) return;
 
     ll::thread::ThreadPoolExecutor::getDefault().execute([]() {
         while (gChunkBorderCount > 0) {
-            std::promise<void> done;
-            auto               future = done.get_future();
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
 
-            ll::thread::ServerThreadExecutor::getDefault().execute([&done]() {
-                // Snapshot the list under lock so we don't hold it during packet sends.
+            // Skip kalau tick sebelumnya masih diproses server thread.
+            // Ini mencegah task numpuk di queue tanpa perlu blocking.
+            bool tickExpected = false;
+            if (!gTickPending.compare_exchange_strong(tickExpected, true)) continue;
+
+            ll::thread::ServerThreadExecutor::getDefault().execute([]() {
                 std::vector<unsigned long long> active;
                 {
                     std::lock_guard lock(gChunkBorderMtx);
@@ -246,13 +252,11 @@ void startChunkBorderLoop() {
                         BDSE::getInstance().getSelf().getLogger().error("chunkBorder: {}", e.what());
                     }
                 }
-                done.set_value(); // signal pool thread that this tick is done
+                gTickPending = false; // tandai tick selesai, boleh dispatch berikutnya
             });
-
-            future.wait(); // wait for server thread to finish before sleeping
-            std::this_thread::sleep_for(std::chrono::milliseconds(40));
         }
-        gLoopRunning = false; // allow a new loop to be spawned if needed later
+        gLoopRunning  = false;
+        gTickPending  = false;
     });
 }
 
